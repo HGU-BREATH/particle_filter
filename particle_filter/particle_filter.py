@@ -62,7 +62,7 @@ class ParticleFiler(Node):
 
     def __init__(self):
         super().__init__('particle_filter')
-
+    
         # declare parameters
         self.declare_parameter('angle_step')
         self.declare_parameter('max_particles')
@@ -264,8 +264,13 @@ class ParticleFiler(Node):
             odom.pose.pose.position.x = pose[0]
             odom.pose.pose.position.y = pose[1]
             odom.pose.pose.orientation = Utils.angle_to_quaternion(pose[2])
-            cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights).flatten()
+            epsilon = 1e-5  # 공분산 정규화를 위한 작은 값
+            cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights) + np.eye(self.particles.shape[1]) * epsilon
+            cov_mat = cov_mat.flatten()
             odom.pose.covariance[:cov_mat.shape[0]] = cov_mat
+
+            #cov_mat = np.cov(self.particles, rowvar=False, ddof=0, aweights=self.weights).flatten()
+            #odom.pose.covariance[:cov_mat.shape[0]] = cov_mat
             odom.twist.twist.linear.x = self.current_speed
             self.odom_pub.publish(odom)
         
@@ -312,6 +317,7 @@ class ParticleFiler(Node):
         pa.header.stamp = self.get_clock().now().to_msg()
         pa.header.frame_id = '/map'
         pa.poses = Utils.particles_to_poses(particles)
+        
         self.particle_pub.publish(pa)
 
     def publish_scan(self, angles, ranges):
